@@ -4,36 +4,36 @@
 #include <errno.h>
 
 typedef struct {
-    char SC[256]; // SourceCurrency
-    char DC[256]; // DestibationCurrency
+    char SourceCurrency[256];
+    char DestinationCurrency[256];
     float Lots;
     double Price;
-} TR;
+} TradeResords;
 
 
-char** SplitString(const char* str, char delimiter) {
-    int count = 0;
-    const char* ptr = str;
-    while (*ptr != '\0') {
-        if (*ptr++ == delimiter) {
-            count++;
+char** SplitStringWithDelimeter(const char* inputString, char delimiter) {
+    int numberOfDeleimeters = 0;
+    const char* copyOfInputString = inputString;
+    while (*copyOfInputString != '\0') {
+        if (*copyOfInputString++ == delimiter) {
+            numberOfDeleimeters++;
         }
     }
 
-    char** tokens = (char**)malloc(sizeof(char*) * (count + 2));
+    char** tokens = (char**)malloc(sizeof(char*) * (numberOfDeleimeters + 2));
     int i = 0;
-    ptr = str;
-    char* token = (char*)malloc(strlen(str) + 1);
+    copyOfInputString = inputString;
+    char* token = (char*)malloc(strlen(inputString) + 1);
     int j = 0;
-    while (*ptr != '\0') {
-        if (*ptr == delimiter) {
+    while (*copyOfInputString != '\0') {
+        if (*copyOfInputString == delimiter) {
             token[j] = '\0';
             tokens[i++] = strdup(token);
             j = 0;
         } else {
-            token[j++] = *ptr;
+            token[j++] = *copyOfInputString;
         }
-        ptr++;
+        copyOfInputString++;
     }
     token[j] = '\0';
     tokens[i++] = strdup(token);
@@ -43,31 +43,31 @@ char** SplitString(const char* str, char delimiter) {
 }
 
 
-int intGetFromString(const char* str, int* value) {
+bool TryGetIntegerValueFromString(const char* inputString, int* value) {
     char* endptr;
-    *value = strtol(str, &endptr, 10);
-    if (endptr == str) {
+    *value = strtol(inputString, &endptr, 10);
+    if (endptr == inputString) {
         return 0;
     }
     return 1;
 }
 
-int toDouble(const char* str, double* value) {
+bool TryGetFloatValueFromString(const char* inputString, double* value) {
     char* endptr;
-    *value = strtod(str, &endptr);
-    if (endptr == str) {
+    *value = strtod(inputString, &endptr);
+    if (endptr == inputString) {
         return 0;
     }
     return 1;
 }
 
-void Process(FILE* stream) {
+void TryConvertCSVtoXML(FILE* tradeRecordFile) {
     char line[1024];
-    TR objects[1024];
+    TradeResords TradeResordObjects[1024];
     int lineCount = 0;
     int objectCount = 0;
 
-    while (fgets(line, sizeof(line), stream)) {
+    while (fgets(line, sizeof(line), tradeRecordFile)) {
         char* fields[3];
         int fieldCount = 0;
         char* token = strtok(line, ",");
@@ -86,20 +86,20 @@ void Process(FILE* stream) {
             continue;
         }
 
-        int tam;
-        if (!intGetFromString(fields[1], &tam)) {
+        int tradeAmount;
+        if (!GetIntegerValueFromString(fields[1], &tradeAmount)) {
             fprintf(stderr, "WARN: Trade amount on line %d not a valid integer: '%s'\n", lineCount + 1, fields[1]);
         }
 
-        double tp;
-        if (!toDouble(fields[2], &tp)) {
+        double tradePrice;
+        if (!GetFloatValueFromString(fields[2], &tradePrice)) {
             fprintf(stderr, "WARN: Trade price on line %d not a valid decimal: '%s'\n", lineCount + 1, fields[2]);
         }
 
-        strncpy(objects[objectCount].SC, fields[0], 3);
-        strncpy(objects[objectCount].DC, fields[0] + 3, 3);
-        objects[objectCount].Lots = tam / LotSize;
-        objects[objectCount].Price = tp;
+        strncpy(TradeResordObjects[objectCount].SourceCurrency, fields[0], 3);
+        strncpy(TradeResordObjects[objectCount].DestinationCurrency, fields[0] + 3, 3);
+        TradeResordObjects[objectCount].Lots = tradeAmount / LotSize;
+        TradeResordObjects[objectCount].Price = tradePrice;
         objectCount++;
         lineCount++;
     }
@@ -108,14 +108,13 @@ void Process(FILE* stream) {
     fprintf(outFile, "<TradeRecords>\n");
     for (int i = 0; i < objectCount; i++) {
         fprintf(outFile, "\t<TradeRecord>\n");
-        fprintf(outFile, "\t\t<SourceCurrency>%s</SourceCurrency>\n", objects[i].SC);
-        fprintf(outFile, "\t\t<DestinationCurrency>%s</DestinationCurrency>\n", objects[i].DC);
-        fprintf(outFile, "\t\t<Lots>%d</Lots>\n", objects[i].Lots);
-        fprintf(outFile, "\t\t<Price>%f</Price>\n", objects[i].Price);
+        fprintf(outFile, "\t\t<SourceCurrency>%s</SourceCurrency>\n", TradeResordObjects[i].SourceCurrency);
+        fprintf(outFile, "\t\t<DestinationCurrency>%s</DestinationCurrency>\n", TradeResordObjects[i].DestinationCurrency);
+        fprintf(outFile, "\t\t<Lots>%d</Lots>\n", TradeResordObjects[i].Lots);
+        fprintf(outFile, "\t\t<Price>%f</Price>\n", TradeResordObjects[i].Price);
         fprintf(outFile, "\t</TradeRecord>\n");
     }
     fprintf(outFile, "</TradeRecords>");
     fclose(outFile);
     printf("INFO: %d trades processed\n", objectCount);
 }
-
